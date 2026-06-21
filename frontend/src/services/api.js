@@ -16,6 +16,14 @@ async function request(path, options = {}) {
   return response.json();
 }
 
+function buildQueryString(params) {
+  const entries = Object.entries(params).filter(
+    ([, value]) => value !== undefined && value !== null && value !== ""
+  );
+  if (!entries.length) return "";
+  return "?" + entries.map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&");
+}
+
 export const api = {
   getClasses: () => request("/classes"),
   createClass: (payload) =>
@@ -35,5 +43,26 @@ export const api = {
   getAttendance: () => request("/attendance"),
   recordAttendance: (payload) =>
     request("/attendance", { method: "POST", body: JSON.stringify(payload) }),
-  getHourStats: () => request("/stats/hours"),
+  getHourStats: (params = {}) =>
+    request(`/stats/hours${buildQueryString(params)}`),
+  exportHourStats: async (params = {}) => {
+    const response = await fetch(
+      `${API_BASE_URL}/stats/hours/export${buildQueryString(params)}`
+    );
+    if (!response.ok) {
+      throw new Error(`导出失败: ${response.status}`);
+    }
+    const blob = await response.blob();
+    const disposition = response.headers.get("Content-Disposition") || "";
+    const match = disposition.match(/filename="?([^"]+)"?/);
+    const filename = match ? match[1] : `hour_stats_${Date.now()}.csv`;
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  },
 };

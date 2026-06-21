@@ -22,6 +22,7 @@ export default function App() {
   const [stats, setStats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [statsFilter, setStatsFilter] = useState({});
 
   const studentMap = useMemo(() => {
     const map = new Map();
@@ -33,21 +34,33 @@ export default function App() {
     return map;
   }, [classes]);
 
+  async function loadStats(filter = {}) {
+    const data = await api.getHourStats(filter);
+    setStats(data);
+  }
+
   async function refreshAll() {
     setError("");
-    const [classData, courseData, scheduleData, attendanceData, statsData] =
-      await Promise.all([
-        api.getClasses(),
-        api.getCourses(),
-        api.getSchedule(),
-        api.getAttendance(),
-        api.getHourStats(),
-      ]);
+    const [classData, courseData, scheduleData, attendanceData] = await Promise.all([
+      api.getClasses(),
+      api.getCourses(),
+      api.getSchedule(),
+      api.getAttendance(),
+    ]);
     setClasses(classData);
     setCourses(courseData);
     setSchedule(scheduleData);
     setAttendance(attendanceData);
-    setStats(statsData);
+    await loadStats(statsFilter);
+  }
+
+  async function handleStatsFilterChange(filter) {
+    setStatsFilter(filter);
+    try {
+      await loadStats(filter);
+    } catch {
+      setError("加载统计数据失败，请重试。");
+    }
   }
 
   useEffect(() => {
@@ -149,7 +162,13 @@ export default function App() {
                 onRecord={handleRecordAttendance}
               />
             )}
-            {activeTab === "stats" && <HourStats stats={stats} />}
+            {activeTab === "stats" && (
+              <HourStats
+                stats={stats}
+                classes={classes}
+                onFilterChange={handleStatsFilterChange}
+              />
+            )}
           </>
         )}
       </main>
